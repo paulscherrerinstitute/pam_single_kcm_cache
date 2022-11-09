@@ -1,0 +1,121 @@
+.\"                                      Hey, EMACS: -*- nroff -*-
+.\" First parameter, NAME, should be all caps
+.\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
+.\" other parameters are allowed: see man(7), man(1)
+.TH PAM_SINGLE_KCM_CACHE 7 "October 18, 2022"
+.\" Please adjust this date whenever revising the manpage.
+.\"
+.\" Some roff macros, for reference:
+.\" .nh        disable hyphenation
+.\" .hy        enable hyphenation
+.\" .ad l      left justify
+.\" .ad b      justify to both left and right margins
+.\" .nf        disable filling
+.\" .fi        enable filling
+.\" .br        insert line break
+.\" .sp <n>    insert n+1 empty lines
+.\" for manpage-specific macros, see man(7)
+.SH NAME
+pam_single_kcm_cache \- user sessions with a single KCM Kerberos credential cache.
+
+.SH SYNOPSIS
+.B pam_single_kcm_cache.so
+.RI [ random | suffix=whatever ][ destroy-source-cache ]
+
+.SH DESCRIPTION
+.B pam_single_kcm_cache
+sets up a single predefined or a random credential cache in
+the KCM (Kerberos Credential Manager) and locks the session to this cache by setting the
+.I KRB5CCNAME
+environment variable appropriately.
+The given cache is populated with the delegated or newly created TGT (ticket granting ticket).
+
+.PP
+If the default Kerberos credential cache is
+.B KCM:
+(e.g. provided by
+.I heimdal-kcm
+or
+.I sssd-kcm
+, then there is one credential cache collection with possible several, at times expired, caches
+of which the KCM selects the default cache with some heuristic. And that heuristic fails at times.
+Additionally there is no isolation between different sessions, e.g. with multiple ssh session to the
+same server.
+
+Following configuration is suggested for shell sessions (e.g. for
+.I /etc/pam.d/sshd
+,
+.I /etc/pam.d/su
+,
+.I /etc/pam.d/login
+) to have a dedicated and isolated session:
+
+  session    optional     pam_single_kcm_cache.so random
+
+But for desktop sessions (
+.I /etc/pam.d/gdm-password
+,
+.I /etc/pam.d/lighdm
+,
+.I /etc/pam.d/sddm
+) it is more handy to have one common and shared cache:
+
+  auth    optional     pam_single_kcm_cache.so suffix=desktop
+
+It is configured in the
+.I auth
+section to make screen unlock work where no new session is created.
+Note it needs to be at the end of the
+.I auth
+section after the preparation of the Kerberos environment (e.g. by
+.I pam_sss.so
+.
+
+A special case is the
+.I systemd --user
+instance which starts with the first user session and ends with the last one.
+So here use the same common cache as the desktop is suggested to be used, except that the source cache
+is not destroyed as it is used later on by the original PAM session which initiated the startup of
+.I systemd --user
+:
+
+  session    optional     pam_single_kcm_cache.so suffix=desktop
+
+.PP
+.\" TeX users may be more comfortable with the \fB<whatever>\fP and
+.\" \fI<whatever>\fP escape sequences to invode bold face and italics,
+.\" respectively.
+.SH OPTIONS
+A summary of options is included below.
+.TP
+.B random
+creates a new cache in the KCM with 10 random letters (to distinguish from automatically generated KCM caches which use a random number).
+It will follow the pattern
+.I KCM:$UID:$RANDOM_LETTERS
+and will contain the newest TGT (not older than 10s) from any KCM cache for given user principal and will set the
+.I KRB5CCNAME
+environment variable to the new random cache so that it is used by default in the new user session.
+.TP
+.B suffix=whatever
+creates a new or uses an existing KCM cache with the name pattern
+.I KCM:$UID:$SUFFIX
+and will contain the newest TGT (not older than 10s) from any KCM cache for given user principal and will set the
+.I KRB5CCNAME
+environment variable to the given cache so that it is used by default in the new user session.
+
+.SH FILES
+.B @libdir@/pam_single_kcm_cache.so
+- the PAM module
+
+.SH VERSION
+@PACKAGE_STRING@
+
+.SH SEE ALSO
+.BR PAM (7)
+and the PAM "The System Administrators' Guide"
+.SH AUTHOR
+.nf
+.I pam_single_kcm_cache
+was written by Konrad Bucheli <konrad.bucheli@psi.ch>.
+.PP
+This manual page was written by Konrad Bucheli <konrad.bucheli@psi.ch>.
