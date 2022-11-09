@@ -11,7 +11,8 @@ Summary:        PAM module for ...
 Group:          Applications/System
 License:        GPLv2+
 URL:            https://github.com/paulscherrerinstitute/pam_single_kcm_cache
-Source0:        https://github.com/paulscherrerinstitute/pam_single_kcm_cache/archive/%{commit}/pam_single_kcm_cache-%{commit}.tar.gz
+Source0:        https://github.com/paulscherrerinstitute/pam_single_kcm_cache/archive/refs/tags/v%{commit}.tar.gz
+
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -47,5 +48,8 @@ rm -rf %{buildroot}
 %{_mandir}/man7/%{upstream_name}.7*
 
 %changelog
+* Wed Nov 9 2022 Konrad Bucheli <konrad.bucheli@psi.ch> - 0.0.1-3
+- Initial Release v0.0.1
+
 * Wed Oct 19 2022 Konrad Bucheli <konrad.bucheli@psi.ch> - 0.0.1-1
 - Initial Build
