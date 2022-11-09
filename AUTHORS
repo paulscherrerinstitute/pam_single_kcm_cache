@@ -1,0 +1,8 @@
+Primary Author:
+	Konrad Bucheli <konrad.bucheli@psi.ch>
+
+Based on Work from:
+        Dave Kinchlea <kinch@kinch.ark.com> (pam_env)
+	Jeroen Nijhof <jeroen@jeroennijhof.nl> (pam_script)
+	R.K. Owen, Ph.D. <rkowen@nersc.gov> (pam_script)
+        MIT (klist)
