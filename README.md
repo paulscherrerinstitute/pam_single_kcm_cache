@@ -1,6 +1,6 @@
 # PAM Single KCM Cache
 
-This PAM module enforces the use of a single KCM cache by creating and populating a custom or random Kerberos credential cache and sets as default cache for the new user session by setting the `KRB5CCNAME` environment variable accordingly.
+This PAM module enforces the use of a single KCM Kerberos credential cache by creating and populating a custom or random cache and sets as default cache for the new user session by setting the `KRB5CCNAME` environment variable accordingly.
 
 ## Problems with `sssd-kcm`
 
