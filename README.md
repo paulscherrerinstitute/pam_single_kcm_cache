@@ -60,6 +60,37 @@ session    optional     pam_single_kcm_cache.so suffix=desktop
 ```
 Note that it needs to be in the `session` section as no authentication is done here.
 
+## Sequence Diagrams
+Below diagrams show how PAM and especially `pam_single_kcm_cache.so`, using above suggested configuration, interact with the KCM and other components in different use cases.
+
+### Login with SSH using Password Authentication
+![Login with SSH and Password Authentication](plantuml/kerberos_sshd_password_only.png)
+
+That is kind of the "common" authentication case where all important work is done in PAM. This is the same for login on the virtual console or when using `su` with password. At the end there is an shell session with a credential cache which is not used by any other session (unless the user shares it somehow manually). Like this session isolation is achieved.
+
+### Login with SSH using Kerberos Authentication and TGT Delegation
+![Login with SSH and Password Authentication](plantuml/kerberos_sshd_tgt_delegation.png)
+
+This is a bit simpler as all the authentication is done in `sshd` and only the session setup is done by PAM. Note that `sshd` does not use the default cache, but instead creates always a new one with the delegated TGT.
+
+### Systemd User Instance
+
+In above diagrams we see that `systemd --user` is being started. It is also using PAM to setup its own session, but it does not do any authentication.
+
+![Startup of Systemd User Instance](plantuml/kerberos_systemd_user.png)
+
+Here we use a predefined name for the credential cache so it can be shared with the desktop sessions. The next diagram shows more in detail how `systemd --user` and the Gnome desktop interact.
+
+### Gnome Desktop
+
+This is the most complex use case:
+
+![Gnome Desktop](plantuml/kerberos_desktop.png)
+
+At the end we have a well known shared credential cache between Gnome and `systemd --user`. This is needed as `systemd --user` is used extensively by Gnome. Important is that the Kerberos setup already happens at authentication phase as there is no session setup phase for screen unlock.
+
+## Compatibility
+This was so far only tested on Red Hat Enterprise Linux 8.6.
 
 ## Author
 

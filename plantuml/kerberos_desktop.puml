@@ -1,0 +1,97 @@
+@startuml
+
+title 
+    **Desktop Authentication**
+    Needs a shared credential cache with //systemd --user// as it is used to start some processes
+    and the TGT needs to be updated on reauthentication when unlocking the screen.
+end title
+
+actor user
+box gdm
+    participant gdm
+    participant libpam
+    participant "pam_sssd.so" as pam_sssd
+    participant "pam_systemd.so" as pam_systemd
+    participant "pam_single_kcm_cache.so" as pam_single_kcm_cache
+end box
+participant sssd
+participant "systemd --user" as systemd
+box KCM
+    participant "sssd-kcm" as sssd_kcm
+    participant "credential cache KCM:$UID:61555" as default_cache
+    participant "credential cache KCM:$UID:desktop" as shared_cache
+end box
+box Gnome
+participant "gnome-session-binary" as gnome_session
+participant "gnome-shell" as gnome_shell
+participant Firefox as firefox
+participant "gnome-terminal" as gnome_terminal
+end box
+box Active Directory
+    participant KDC as kdc
+end box
+
+== authentication ==
+user -> gdm : authenticates with password
+gdm -> libpam : authenticate user
+libpam -> pam_sssd : //pam_sm_setcred()//
+pam_sssd -> sssd : authenticate
+sssd -> kdc : authenticate and get TGT
+sssd -> sssd_kcm : get default cache
+sssd -> default_cache : place TGT
+libpam -> pam_single_kcm_cache : //pam_sm_setcred()//
+pam_single_kcm_cache -> sssd_kcm : iterate all suitable caches to find newest TGT
+note right: the default cache may change in between
+pam_single_kcm_cache -> default_cache: get TGT
+pam_single_kcm_cache -> sssd_kcm : create new shared cache if it does not exist yet
+create shared_cache
+sssd_kcm -> shared_cache: create
+pam_single_kcm_cache -> shared_cache: place newest TGT
+pam_single_kcm_cache -> libpam: set //KRB5CCNAME=KCM:$UID:desktop//
+
+gdm -> libpam : setup session
+libpam -> pam_systemd : //pam_sm_open_session()//
+create systemd
+pam_systemd -> systemd: start if not running yet
+
+== starting the desktop ==
+create gnome_session
+gdm -> gnome_session : start Gnome session
+gnome_session -> systemd : start some Gnome services
+gnome_session -> gnome_session: start more Gnome services
+create gnome_shell
+gnome_session -> gnome_shell: start Gnome Shell
+
+== starting programs ==
+user -> gnome_shell: open browser
+create firefox
+gnome_shell -> firefox : start
+
+user -> gnome_shell : open terminal
+gnome_shell -> systemd: start gnome-terminal
+create gnome_terminal
+systemd -> gnome_terminal: start
+
+== screen lock and unlock ==
+user -> gnome_shell : lock screen
+gnome_shell -> gdm : lock screen
+
+user -> gdm : authenticates with password
+gdm -> libpam : authenticate user
+libpam -> pam_sssd : //pam_sm_setcred()//
+pam_sssd -> sssd : authenticate
+sssd -> kdc : authenticate and get TGT
+sssd -> sssd_kcm : get default cache
+sssd -> default_cache : place TGT
+libpam -> pam_single_kcm_cache : //pam_sm_setcred()//
+pam_single_kcm_cache -> sssd_kcm : iterate all suitable caches to find newest TGT
+note right: the default cache may change in between
+pam_single_kcm_cache -> default_cache: get TGT
+pam_single_kcm_cache -> sssd_kcm : get shared cache
+pam_single_kcm_cache -> shared_cache: place newest TGT
+note over gdm : no session setup step
+gdm -> gnome_shell : screen unlocked
+
+@enduml
+
+

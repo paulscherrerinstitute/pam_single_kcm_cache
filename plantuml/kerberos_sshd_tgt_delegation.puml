@@ -1,0 +1,49 @@
+@startuml
+
+title 
+    **SSH with TGT Delegation**
+    Provide every shell session an individual and isolated credential cache in KCM.
+end title
+hide footbox
+
+actor user
+box sshd
+    participant sshd
+
+    participant libpam
+    participant "pam_systemd.so" as pam_systemd
+    participant "pam_single_kcm_cache.so" as pam_single_kcm_cache
+end box
+participant "systemd --user" as systemd
+box KCM
+    participant "sssd-kcm" as sssd_kcm
+    participant "credential cache KCM:$UID:61555" as new_cache
+    participant "credential cache KCM:$UID:sitmchszro" as random_cache
+end box
+participant bash
+
+user -> sshd : connects using //ssh//\nwith //GSSAPIDelegateCredentials=yes//\nand authentication method //gssapi-with-mic//
+note right: authentication is done without libpam
+sshd -> sssd_kcm : get new cache
+create new_cache
+sssd_kcm -> new_cache : create
+sshd -> new_cache : place delegated TGT
+sshd -> libpam : setup session
+libpam -> pam_systemd : //pam_sm_open_session()//
+create systemd
+pam_systemd -> systemd: start if not running yet
+libpam -> pam_single_kcm_cache : //pam_sm_open_session()//
+pam_single_kcm_cache -> sssd_kcm : iterate all suitable caches to find newest TGT
+note right: the default cache might be KCM:$UID:61555 or not
+pam_single_kcm_cache -> new_cache: get TGT
+pam_single_kcm_cache -> sssd_kcm : create new random cache
+create random_cache
+sssd_kcm -> random_cache: create
+pam_single_kcm_cache -> random_cache: place newest TGT
+pam_single_kcm_cache -> libpam: set //KRB5CCNAME=KCM:$UID:sitmchszro//
+create bash
+sshd -> bash : start
+
+@enduml
+
+

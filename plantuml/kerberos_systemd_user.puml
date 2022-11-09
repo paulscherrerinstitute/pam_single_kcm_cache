@@ -1,0 +1,35 @@
+@startuml
+
+title 
+    **Startup of Systemd User Instance**
+    One single //systemd --user// instance spans from the start of the first session
+    to the end of the last session and has access to the same credential cache as the desktop.
+end title
+hide footbox
+
+box Systemd User Instance
+    participant "systemd --user" as systemd
+    participant libpam
+    participant "pam_single_kcm_cache.so" as pam_single_kcm_cache
+end box
+box KCM
+    participant "sssd-kcm" as sssd_kcm
+    participant "credential cache KCM:$UID:61555" as default_cache
+    participant "credential cache KCM:$UID:desktop" as shared_cache
+end box
+
+note over systemd : no authentication step
+systemd -> libpam : setup session
+libpam -> pam_single_kcm_cache : //pam_sm_open_session()//
+pam_single_kcm_cache -> sssd_kcm : iterate all suitable caches to find newest TGT
+note right: the default cache may change in between
+pam_single_kcm_cache -> default_cache: get TGT
+pam_single_kcm_cache -> sssd_kcm : create shared cache if not yet exists
+create shared_cache
+sssd_kcm -> shared_cache: create
+pam_single_kcm_cache -> shared_cache: place newest TGT
+pam_single_kcm_cache -> libpam: set //KRB5CCNAME=KCM:$UID:desktop//
+
+@enduml
+
+
