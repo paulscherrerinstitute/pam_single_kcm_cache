@@ -98,3 +98,7 @@ This was so far only tested on Red Hat Enterprise Linux 8.6.
 with inspiration from [pam_env.so](https://github.com/linux-pam/linux-pam/blob/master/modules/pam_env/pam_env.c),
 [pam_script.so](https://github.com/jeroennijhof/pam_script)
 and [klist](https://github.com/krb5/krb5/blob/master/src/clients/klist/klist.c)
+
+## Apropos
+
+A solution to similar problems using AFS with KCM is the [`renew-afstoken script`](ihttps://github.com/paulscherrerinstitute/renew-afstoken).
