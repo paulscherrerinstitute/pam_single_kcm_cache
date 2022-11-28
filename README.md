@@ -101,4 +101,4 @@ and [klist](https://github.com/krb5/krb5/blob/master/src/clients/klist/klist.c)
 
 ## Apropos
 
-A solution to similar problems using AFS with KCM is the [`renew-afstoken script`](ihttps://github.com/paulscherrerinstitute/renew-afstoken).
+A solution to similar problems using AFS with KCM is the [renew-afstoken script](ihttps://github.com/paulscherrerinstitute/renew-afstoken).
