@@ -13,6 +13,7 @@
 ACLOCAL_AMFLAGS = -I m4
 
 man_MANS = pam_single_kcm_cache.7
+dist_doc_DATA = README.md
 
 moduledir = @libdir@
 module_LTLIBRARIES = pam_single_kcm_cache.la
