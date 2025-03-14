@@ -1,18 +1,15 @@
-%global commit 0.0.2
-%global shortcommit %(c=%{commit}; echo ${c:0:7})
 %global _hardened_build 1
 %global upstream_name pam_single_kcm_cache
 
 Name:           pam_single_kcm_cache
 Version:        0.0.2
 Release:        1%{?dist}
-Summary:        PAM module for ...
+Summary:        This PAM module enforces the use of a single KCM Kerberos credential cache by creating and populating a custom or random cache and sets as default cache for the new user session by setting the KRB5CCNAME environment variable accordingly.
 
 Group:          Applications/System
 License:        GPLv2+
 URL:            https://github.com/paulscherrerinstitute/pam_single_kcm_cache
-Source0:        https://github.com/paulscherrerinstitute/pam_single_kcm_cache/archive/refs/tags/v%{commit}.tar.gz
-
+Source0:        https://github.com/paulscherrerinstitute/pam_single_kcm_cache/releases/download/v%{version}/pam_single_kcm_cache-%{version}.tar.gz
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -27,7 +24,7 @@ pam_script allows you to execute scripts during authorization, password
 changes and session openings or closings.
 
 %prep
-%setup -qn %{name}-%{commit}
+%setup -q
 
 #generate our configure script
 autoreconf -vfi

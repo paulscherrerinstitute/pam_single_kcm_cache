@@ -9,7 +9,7 @@ AC_PREREQ([2.59])
 AC_COPYRIGHT([
 See the included file: COPYING for copyright information.
 ])
-AC_INIT([pam_single_kcm_cache], [0.0.2.], [konrad.bucheli@psi.ch])
+AC_INIT([pam_single_kcm_cache], [0.0.2], [konrad.bucheli@psi.ch])
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE([foreign])
 AC_CONFIG_SRCDIR([pam_single_kcm_cache.c])
