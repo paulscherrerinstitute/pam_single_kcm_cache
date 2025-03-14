@@ -1,3 +1,9 @@
+2025-03-14  Konrad Bucheli<konrad.bucheli@psi.ch>
+
+	* Release v0.0.2
+	* do not filter older TGTs
+	* use krb5_c_random_make_octets() instead of rand()
+
 2022-11-09  Konrad Bucheli<konrad.bucheli@psi.ch>
 
 	* Initial version 0.0.1

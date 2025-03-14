@@ -31,21 +31,8 @@
 
 #define PAM_DEBUG_ARG                   0x01
 
-/* inspiration: https://github.com/Perl/perl5/blob/v5.22.0/util.c#L4488 */
-void seed() {
-    struct timeval when;
-    unsigned int seed;
-
-    gettimeofday(&when, NULL);
-
-    seed = 1000003 * when.tv_sec + 3 * when.tv_usec;
-    seed += 269 * getpid();
-    seed += 26107 * (unsigned int) (unsigned long long) &when;
-    srand(seed);
-}
-
 static int
-pam_parse (const pam_handle_t *pamh, int argc, const char **argv, char **cc_suffix)
+pam_parse (const pam_handle_t *pamh, krb5_context context, int argc, const char **argv, char **cc_suffix)
 {
     int ctrl=0;
 
@@ -63,11 +50,22 @@ pam_parse (const pam_handle_t *pamh, int argc, const char **argv, char **cc_suff
 
         /* random credential cache name */
         else if (!strcmp(*argv, "random")) {
-            static const int a = 'a',  z= 'z';
-            char key[11];
-            seed();
+            static const int a = 'a',  z = 'z';
+            unsigned char key[11];
+            krb5_data rand_data;
+            unsigned char rand_buffer[10];
+            rand_data.data = rand_buffer;
+            rand_data.length = sizeof(rand_buffer);
+            krb5_error_code ret = krb5_c_random_make_octets(context, &rand_data);
+            if (ret) {
+                /* fallback to rand() on error */
+                for(unsigned int i = 0; i < sizeof rand_buffer; i++) {
+                    rand_buffer[i] = (unsigned char) rand();
+                }
+            }
+
             for(unsigned int i = 0; i < sizeof key - 1; i++) {
-                key[i] = (char) (rand() % (z - a + 1) + a);
+                key[i] = rand_buffer[i] % (z - a + 1) + a;
             }
             key[sizeof key - 1] = '\0';
             *cc_suffix = strdup(key);
@@ -195,7 +193,6 @@ get_best_source_ccache (pam_handle_t *pamh, krb5_context context, const char *us
     memset(&overall_youngest_tgt, 0, sizeof(overall_youngest_tgt)); /* https://web.mit.edu/kerberos/krb5-devel/doc/appdev/init_creds.html */
     krb5_timestamp overall_youngest_tgt_ts = 0;
     krb5_timestamp now = time(NULL);
-    krb5_timestamp not_older = now - 10;
 
     while ((error = krb5_cccol_cursor_next(context, cursor, &cache)) == 0 &&
         cache != NULL) {
@@ -244,8 +241,7 @@ get_best_source_ccache (pam_handle_t *pamh, krb5_context context, const char *us
             krb5_timestamp tgt_expiration = tgt.times.endtime;
             krb5_timestamp tgt_init = tgt.times.starttime ? tgt.times.starttime : tgt.times.authtime;
             if (ts_after(tgt_expiration, now)
-                && ts_after(tgt_init, overall_youngest_tgt_ts)
-                && ts_after(tgt_init, not_older)) {
+                && ts_after(tgt_init, overall_youngest_tgt_ts)) {
 
                 /* all fine, so lets keep the cache name and expiration */
                 if (overall_youngest_cache) {
@@ -292,11 +288,10 @@ get_best_source_ccache (pam_handle_t *pamh, krb5_context context, const char *us
   copy over tickets from newest normal cache
 */
 static int
-prepare_ccache (pam_handle_t *pamh, const char *cache_name, const char *username, uid_t uid)
+prepare_ccache (pam_handle_t *pamh, krb5_context context, const char *cache_name, const char *username, uid_t uid)
 {
     int retval = PAM_IGNORE;
 
-    krb5_context context = NULL;
     krb5_error_code error;
     const char *error_msg = NULL;
     krb5_ccache source_cache = NULL;
@@ -406,7 +401,6 @@ exit:
     krb5_free_cred_contents(context, &source_tgt);
     if (source_cache_name) krb5_free_string(context, source_cache_name);
     if (error_msg) krb5_free_error_message(context, error_msg);
-    if (context) krb5_free_context(context);
     if (krb5ccname) setenv("KRB5CCNAME", krb5ccname, 1);
     return retval;
 }
@@ -414,11 +408,24 @@ exit:
 static int
 set_ideal_kerberos_cc_env (pam_handle_t *pamh, int argc, const char **argv)
 {
-    char *cc_suffix;
-    pam_parse(pamh, argc, argv, &cc_suffix);
+    char *cc_suffix = NULL;
+    krb5_context context = NULL;
+    krb5_error_code error;
 
+    /* initalize Kerberos library */
+    error = krb5_init_context(&context);
+    if (error) {
+         /* this is fine: https://kerberos.mit.narkive.com/p4aRb9Gk/how-to-use-krb5-get-error-message-when-context-initialization-failed */
+        const char *error_msg = krb5_get_error_message(context, error);
+        pam_syslog(pamh, LOG_ERR, "%s while initializing krb5", error_msg);
+        krb5_free_error_message(context, error_msg);
+        return PAM_IGNORE;
+    }
+
+    pam_parse(pamh, context, argc, argv, &cc_suffix);
     if (!cc_suffix) {
         pam_syslog(pamh, LOG_ERR, "select 'random' or 'suffix=whatever'");
+        krb5_free_context(context);
         return PAM_IGNORE;
     }
 
@@ -426,15 +433,17 @@ set_ideal_kerberos_cc_env (pam_handle_t *pamh, int argc, const char **argv)
     const char *username = NULL;
     if (pam_get_item(pamh, PAM_USER, (const void**) &username) != PAM_SUCCESS) {
         free(cc_suffix);
+        krb5_free_context(context);
         return PAM_IGNORE;     /* let pam_get_item() log the error */
     }
 
     struct passwd *user_entry = NULL;
     if (username)
-        user_entry = pam_modutil_getpwnam (pamh, username);
+        user_entry = pam_modutil_getpwnam(pamh, username);
     if (!user_entry) {
         pam_syslog(pamh, LOG_ERR, "No such user '%s'!?", username);
         free(cc_suffix);
+        krb5_free_context(context);
         return PAM_IGNORE;
     }
 
@@ -442,6 +451,7 @@ set_ideal_kerberos_cc_env (pam_handle_t *pamh, int argc, const char **argv)
     if (asprintf(&target_cache, "KCM:%d:%s", user_entry->pw_uid, cc_suffix) < 0) {
         pam_syslog(pamh, LOG_CRIT, "Out of memory");
         free(cc_suffix);
+        krb5_free_context(context);
         return PAM_BUF_ERR;
     }
     free(cc_suffix);
@@ -453,22 +463,25 @@ set_ideal_kerberos_cc_env (pam_handle_t *pamh, int argc, const char **argv)
     if (seteuid(user_entry->pw_uid) != 0) {
         pam_syslog(pamh, LOG_ERR, "Could not change to user '%s': %s", username, strerror(errno));
         free(target_cache);
+        krb5_free_context(context);
         return PAM_IGNORE;
     }
 
     /* ensure that the given credential cache exists at the end
        and whatever has been set up already is copied over  */
-    int retval = prepare_ccache(pamh, target_cache, username, user_entry->pw_uid);
+    int retval = prepare_ccache(pamh, context, target_cache, username, user_entry->pw_uid);
 
     /* go back to root */
     if (seteuid(pam_uid) != 0) {
         pam_syslog(pamh, LOG_ERR, "Could not change back to user root: %s", strerror(errno));
         free(target_cache);
+        krb5_free_context(context);
         return PAM_IGNORE;
     }
 
     if (retval != PAM_SUCCESS) {
         free(target_cache);
+        krb5_free_context(context);
         return retval; /* let prepare_ccache() log the error */
     }
     /* set KRB5CCNAME environment variable */
@@ -476,6 +489,7 @@ set_ideal_kerberos_cc_env (pam_handle_t *pamh, int argc, const char **argv)
     if (asprintf(&env_entry, "KRB5CCNAME=%s", target_cache) < 0) {
         pam_syslog(pamh, LOG_CRIT, "Out of memory");
         free(target_cache);
+        krb5_free_context(context);
         return PAM_BUF_ERR;
     }
     free(target_cache);
@@ -485,6 +499,7 @@ set_ideal_kerberos_cc_env (pam_handle_t *pamh, int argc, const char **argv)
         pam_syslog(pamh, LOG_ERR, "could not set environment variable %s", env_entry);
     }
     free(env_entry);
+    krb5_free_context(context);
     return retval;
 }
 

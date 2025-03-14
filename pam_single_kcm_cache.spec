@@ -1,11 +1,11 @@
-%global commit 0.0.1
+%global commit 0.0.2
 %global shortcommit %(c=%{commit}; echo ${c:0:7})
 %global _hardened_build 1
 %global upstream_name pam_single_kcm_cache
 
 Name:           pam_single_kcm_cache
-Version:        0.0.1
-Release:        3%{?dist}
+Version:        0.0.2
+Release:        1%{?dist}
 Summary:        PAM module for ...
 
 Group:          Applications/System
@@ -16,7 +16,8 @@ Source0:        https://github.com/paulscherrerinstitute/pam_single_kcm_cache/ar
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
-BuildRequires:  pam-devel 
+BuildRequires:  krb5-devel
+BuildRequires:  pam-devel
 BuildRequires:  autoconf
 BuildRequires:  automake
 BuildRequires:  libtool
@@ -48,6 +49,11 @@ rm -rf %{buildroot}
 %{_mandir}/man7/%{upstream_name}.7*
 
 %changelog
+* Fri Mar 14 2025 Konrad Bucheli <konrad.bucheli@psi.ch> - 0.0.2-1
+- Release v0.0.2
+- do not filter older TGTs
+- use krb5_c_random_make_octets() instead of rand()
+
 * Wed Nov 9 2022 Konrad Bucheli <konrad.bucheli@psi.ch> - 0.0.1-3
 - Initial Release v0.0.1
 
