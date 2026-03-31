@@ -389,6 +389,15 @@ prepare_ccache (pam_handle_t *pamh, krb5_context context, const char *cache_name
             goto exit;
         }
         pam_syslog(pamh, LOG_INFO, "Copied TGT from credential cache '%s' to fixed credential cache '%s'", source_cache_name, cache_name);
+
+        /* make the new cache the primary cache of the collection */
+        error = krb5_cc_switch(context, fixed_cache);
+        if (error) {
+            error_msg = krb5_get_error_message(context, error);
+            pam_syslog(pamh, LOG_ERR, "%s while switching the primary credential cache to '%s'", error_msg, cache_name);
+            retval = PAM_IGNORE;
+            goto exit;
+        }
     }
 
     retval = PAM_SUCCESS;
@@ -522,9 +531,11 @@ pam_sm_acct_mgmt (pam_handle_t *pamh, int flags UNUSED,
 }
 
 int
-pam_sm_setcred (pam_handle_t *pamh, int flags UNUSED,
+pam_sm_setcred (pam_handle_t *pamh, int flags,
                 int argc, const char **argv)
 {
+    if (flags & PAM_DELETE_CRED)
+        return PAM_IGNORE;
     return set_ideal_kerberos_cc_env(pamh, argc, argv);
 }
 
