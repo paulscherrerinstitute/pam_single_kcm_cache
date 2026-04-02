@@ -2,7 +2,7 @@
 %global upstream_name pam_single_kcm_cache
 
 Name:           pam_single_kcm_cache
-Version:        0.0.2
+Version:        0.0.3
 Release:        1%{?dist}
 Summary:        This PAM module enforces the use of a single KCM Kerberos credential cache by creating and populating a custom or random cache and sets as default cache for the new user session by setting the KRB5CCNAME environment variable accordingly.
 
@@ -46,6 +46,12 @@ rm -rf %{buildroot}
 %{_mandir}/man7/%{upstream_name}.7*
 
 %changelog
+* Thu Apr 2 2026 Konrad Bucheli <konrad.bucheli@psi.ch> - 0.0.3-1
+- Release v0.0.3
+- switch primary KCM cache to used cache, this fixes kernel NFS upcalls using gss-proxy
+- do nothing for PAM_DELETE_CRED
+
+
 * Fri Mar 14 2025 Konrad Bucheli <konrad.bucheli@psi.ch> - 0.0.2-1
 - Release v0.0.2
 - do not filter older TGTs
